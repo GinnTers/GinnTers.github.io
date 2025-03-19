@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Xác suất bán hàng của Mặt hàng theo Nhóm hàng theo Tháng</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    .line {
+      fill: none;
+      stroke: steelblue;
+      stroke-width: 2px;
+    }
+    .bar {
+      fill: lightsteelblue;
+    }
+    .bar-label, .axis-label {
+      font-size: 12px;
+      fill: black;
+    }
+  </style>
+</head>
+<body>
+  <h2>Xác suất bán hàng của Mặt hàng theo Nhóm hàng theo Tháng</h2>
+  <div id="charts"></div>
+
+  <script>
+    d3.csv("data_ggsheet.csv").then(function(data) {
+      console.log("Dữ liệu đã load:", data);
+
+      // Chuyển đổi định dạng thời gian
+      data.forEach(d => {
+        d["Tháng"] = "T" + d["Thời gian tạo đơn"].slice(5,7); // Trích xuất tháng theo format "Tmm"
+        d["Nhóm hàng"] = `[${d["Mã nhóm hàng"]}] ${d["Tên nhóm hàng"]}`;
+        d["Mặt hàng"] = `[${d["Mã mặt hàng"]}] ${d["Tên mặt hàng"]}`;
+      });
+
+      // Tính số đơn hàng theo từng Mặt hàng & Nhóm hàng theo Tháng
+      const mhNhOrders = d3.rollup(data,
+        v => new Set(v.map(d => d["Mã đơn hàng"]).filter(Boolean)).size,
+        d => d["Mặt hàng"],
+        d => d["Nhóm hàng"],
+        d => d["Tháng"]
+      );
+
+      // Tính tổng số đơn hàng theo Nhóm hàng và Tháng
+      const nhOrders = d3.rollup(data,
+        v => new Set(v.map(d => d["Mã đơn hàng"]).filter(Boolean)).size,
+        d => d["Nhóm hàng"],
+        d => d["Tháng"]
+      );
+
+      // Gộp dữ liệu và tính xác suất
+      let dataset = [];
+      mhNhOrders.forEach((groupData, item) => {
+        groupData.forEach((monthData, group) => {
+          monthData.forEach((count, month) => {
+            const total = nhOrders.get(group)?.get(month) || 1;
+            dataset.push({
+              group,
+              item,
+              month,
+              probability: (count / total) * 100
+            });
+          });
+        });
+      });
+
+      // Chỉ lấy 5 nhóm hàng được chỉ định
+      const selectedGroups = ["[BOT] Bột", "[SET] Set trà", "[THO] Trà hoa", "[TMX] Trà mix", "[TTC] Trà củ, quả sấy"];
+      dataset = dataset.filter(d => selectedGroups.includes(d.group));
+
+      // Tạo biểu đồ cho từng nhóm hàng
+      const chartWidth = 350, chartHeight = 250, margin = {top: 30, right: 30, bottom: 50, left: 60};
+      const container = d3.select("#charts")
+        .style("display", "grid")
+        .style("grid-template-columns", "repeat(3, 1fr)")
+        .style("gap", "20px");
+
+      selectedGroups.forEach(group => {
+        const groupData = dataset.filter(d => d.group === group);
+        const months = Array.from(new Set(groupData.map(d => d.month))).sort();
+        const items = Array.from(new Set(groupData.map(d => d.item)));
+
+        const svg = container.append("svg")
+          .attr("width", chartWidth + margin.left + margin.right)
+          .attr("height", chartHeight + margin.top + margin.bottom)
+          .append("g")
+          .attr("transform", `translate(${margin.left},${margin.top})`);
+
+        const x = d3.scaleBand()
+          .domain(months)
+          .range([0, chartWidth])
+          .padding(0.1);
+
+        const y = d3.scaleLinear()
+          .domain([0, d3.max(groupData, d => d.probability)])
+          .nice()
+          .range([chartHeight, 0]);
+
+        const color = d3.scaleOrdinal(d3.schemeCategory10).domain(items);
+
+        svg.append("g")
+          .attr("transform", `translate(0,${chartHeight})`)
+          .call(d3.axisBottom(x));
+
+        svg.append("g")
+          .call(d3.axisLeft(y).ticks(5).tickFormat(d => d + "%"));
+
+        items.forEach(item => {
+          const itemData = groupData.filter(d => d.item === item);
+
+          const line = d3.line()
+            .x(d => x(d.month) + x.bandwidth() / 2)
+            .y(d => y(d.probability));
+
+          svg.append("path")
+            .datum(itemData)
+            .attr("class", "line")
+            .attr("d", line)
+            .attr("stroke", color(item));
+
+          svg.selectAll(".dot")
+            .data(itemData)
+            .enter()
+            .append("circle")
+            .attr("cx", d => x(d.month) + x.bandwidth() / 2)
+            .attr("cy", d => y(d.probability))
+            .attr("r", 4)
+            .attr("fill", color(item));
+        });
+
+        svg.append("text")
+          .attr("x", chartWidth / 2)
+          .attr("y", -10)
+          .attr("text-anchor", "middle")
+          .style("font-size", "16px")
+          .text(group);
+      });
+    }).catch(error => console.error("Lỗi khi đọc CSV:", error));
+  </script>
+</body>
+</html>

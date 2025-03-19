@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Biểu đồ cột D3.js từ CSV</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        #chart-container {
+            width: 800px;
+            height: 500px;
+            margin-top: 20px; /* Điều chỉnh khoảng cách từ đầu trang */
+        }
+        svg {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <h2>Biểu đồ cột: Doanh thu theo nhóm hàng</h2>
+    
+    <!-- Đặt biểu đồ vào đây -->
+    <div id="chart-container">
+        <svg width="800" height="500"></svg>
+    </div>
+
+    <script>
+        let width = 800, height = 500;
+        let margin = { top: 40, right: 30, bottom: 100, left: 80 };
+
+        let svg = d3.select("#chart-container svg")
+            .attr("width", width)
+            .attr("height", height);
+
+        d3.csv("data_ggsheet.csv", function(d) {
+            return {
+                ...d, 
+                "Thời gian tạo đơn": new Date(d["Thời gian tạo đơn"]), 
+                "SL": +d["SL"], 
+                "Đơn giá": +d["Đơn giá"], 
+                "Thành tiền": +d["Thành tiền"] 
+            };
+        }).then(function(data) {
+            console.log("Dữ liệu CSV:", data);
+        
+            let doanhThuTheoMatHang = d3.rollup(
+                data,
+                v => d3.sum(v, d => d["Thành tiền"]),
+                d => d["Tên mặt hàng"]
+            );
+        
+            let dataset = Array.from(doanhThuTheoMatHang, ([name, totalRevenue]) => ({ name, totalRevenue }));
+
+            let xScale = d3.scaleBand()
+                .domain(dataset.map(d => d.name))
+                .range([margin.left, width - margin.right])
+                .padding(0.2);
+        
+            let yScale = d3.scaleLinear()
+                .domain([0, d3.max(dataset, d => d.totalRevenue)])
+                .nice()
+                .range([height - margin.bottom, margin.top]);
+
+            svg.append("g")
+                .attr("transform", `translate(0,${height - margin.bottom})`)
+                .call(d3.axisBottom(xScale))
+                .selectAll("text")
+                .attr("transform", "rotate(-45)")
+                .style("text-anchor", "end");
+
+            svg.append("g")
+                .attr("transform", `translate(${margin.left},0)`)
+                .call(d3.axisLeft(yScale));
+
+            svg.selectAll(".bar")
+                .data(dataset)
+                .enter().append("rect")
+                .attr("class", "bar")
+                .attr("x", d => xScale(d.name))
+                .attr("y", d => yScale(d.totalRevenue))
+                .attr("width", xScale.bandwidth())
+                .attr("height", d => height - margin.bottom - yScale(d.totalRevenue))
+                .attr("fill", "steelblue");
+
+            svg.selectAll(".text")
+                .data(dataset)
+                .enter().append("text")
+                .attr("x", d => xScale(d.name) + xScale.bandwidth() / 2)
+                .attr("y", d => yScale(d.totalRevenue) - 5)
+                .attr("text-anchor", "middle")
+                .text(d => d.totalRevenue);
+        });
+    </script>
+</body>
+</html>

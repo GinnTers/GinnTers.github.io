@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bài tập D3.js</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+        }
+        .tab-container {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 30px; /* Đẩy các nút lên cao hơn */
+        }
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            border: 1px solid #ccc;
+            margin: 0 5px;
+            background-color: #f9f9f9;
+        }
+        .tab.active {
+            background-color: #ddd;
+            font-weight: bold;
+        }
+        .button-container {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
+        }
+        
+        .chart-container {
+            margin-top: 60px; /* Điều chỉnh khoảng cách giữa nút và biểu đồ */
+            position: relative;
+        }
+        
+        #chart {
+            flex: 4; /* Tăng kích thước biểu đồ */
+            max-width: 800px; /* Đặt giới hạn chiều rộng */
+        }
+        
+        #legend {
+            flex: 1;
+            text-align: left;
+            background: #f9f9f9;
+            padding: 15px;
+            min-width: 200px; /* Giảm bớt để phù hợp trên màn hình nhỏ */
+            max-width: 250px; /* Giới hạn tối đa */
+        }
+    </style>
+</head>
+<body>
+
+    <div class="tab-container" id="tabs">
+        <div class="tab active" data-quarter="Q1">Q1</div>
+        <div class="tab" data-quarter="Q2">Q2</div>
+        <div class="tab" data-quarter="Q3">Q3</div>
+        <div class="tab" data-quarter="Q4">Q4</div>
+        <div class="tab" data-quarter="Q5">Q5</div>
+        <div class="tab" data-quarter="Q6">Q6</div>
+        <div class="tab" data-quarter="Q7">Q7</div>
+        <div class="tab" data-quarter="Q8">Q8</div>
+        <div class="tab" data-quarter="Q9">Q9</div>
+        <div class="tab" data-quarter="Q10">Q10</div>
+        <div class="tab" data-quarter="Q11">Q11</div>
+        <div class="tab" data-quarter="Q12">Q12</div>
+    </div>
+
+    <div class="chart-container">
+        <div id="chart"></div>
+        <div id="legend"></div>
+    </div>
+
+    <script>
+        function loadScript(quarter) {
+            console.log("Loading:", quarter + ".js");
+
+            // Xóa nội dung cũ của biểu đồ
+            d3.select("#chart").html("");
+            d3.select("#legend").html("");
+
+            // Kiểm tra và xóa script cũ trước khi tải script mới
+            let oldScript = document.getElementById("dynamicScript");
+            if (oldScript) {
+                oldScript.remove();
+            }
+
+            // Tạo script mới để tải file .js tương ứng
+            let script = document.createElement("script");
+            script.src = quarter + ".js";
+            script.id = "dynamicScript";
+            script.onload = function() {
+                console.log(quarter + ".js loaded");
+
+                let functionName = `load${quarter}Chart`;
+                if (typeof window[functionName] === "function") {
+                    window[functionName]();  // Gọi hàm vẽ biểu đồ
+                } else {
+                    console.error(`Hàm ${functionName}() không tồn tại trong ${quarter}.js`);
+                }
+            };
+            script.onerror = function() {
+                console.error(`Không thể tải ${quarter}.js. Kiểm tra xem file có tồn tại không.`);
+            };
+
+            document.body.appendChild(script);
+        }
+
+        // Xử lý sự kiện khi nhấn tab để chuyển biểu đồ
+        document.querySelectorAll(".tab").forEach(tab => {
+            tab.addEventListener("click", function() {
+                document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+                this.classList.add("active");
+                loadScript(this.getAttribute("data-quarter"));
+            });
+        });
+
+        // Mặc định tải biểu đồ Q1 khi trang load lần đầu
+        loadScript("Q1");
+    </script>
+</body>
+</html>
